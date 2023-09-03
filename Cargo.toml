@@ -1,0 +1,9 @@
+[package]
+name = "rust_screenshot"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+raylib = "3.7.0"
+scrap = "0.5"
+repng = "0.2.2"
