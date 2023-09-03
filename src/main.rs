@@ -128,15 +128,24 @@ fn main() {
         if rl.is_key_down(raylib::consts::KeyboardKey::KEY_DOWN) {
             camera.zoom -= 0.05;
         }
-        let mouse_delta = rl.get_mouse_wheel_move();
-        delta_scale += mouse_delta;
 
-        let delta = rl.get_frame_time();
-        camera.zoom = camera.zoom + delta_scale * delta * (zoom_speed * camera.zoom);
-        if camera.zoom < 0.01 {
-            camera.zoom = 0.01;
+        let mouse_pos = rl.get_mouse_position();
+        let wheel = rl.get_mouse_wheel_move();
+        if wheel != 0.0 || delta_scale != 0.0 {
+            delta_scale += wheel;
+
+            let delta = rl.get_frame_time();
+            camera.zoom = camera.zoom + delta_scale * delta * (zoom_speed * camera.zoom);
+            if camera.zoom < 0.01 {
+                camera.zoom = 0.01;
+            }
+            delta_scale -= delta_scale * delta * zoom_friction;
+            if delta_scale < 0.1 && delta_scale > -0.1 {
+                delta_scale = 0.0;
+            }
+            camera.target = rl.get_screen_to_world2D(mouse_pos, camera);
+            camera.offset = mouse_pos;
         }
-        delta_scale -= delta_scale * delta * zoom_friction;
         //let mut new_zoom = camera.zoom + mouse_delta * (0.07f32 * camera.zoom);
         // Capping the zoom so you don't zoom
         // out oo much and get lost
@@ -146,7 +155,6 @@ fn main() {
 
         //camera.zoom = new_zoom;
 
-        let mouse_pos = rl.get_mouse_position();
         let delta = prev_mouse_pos - mouse_pos;
         prev_mouse_pos = mouse_pos;
 
@@ -163,7 +171,7 @@ fn main() {
         }
 
         d.draw_text("Press Q or ESCAPE to quit", 10, 10, 20, Color::GRAY);
-        let zoom_amount = format!("{zoom}", zoom = camera.zoom);
+        let zoom_amount = format!("zoom amount = {zoom}", zoom = camera.zoom);
         d.draw_text(&zoom_amount, 10, 30, 20, Color::GRAY);
 
         /*
