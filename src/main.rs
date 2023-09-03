@@ -15,33 +15,15 @@ use std::thread;
 use std::time::Duration;
 
 fn main() {
-    let screenshot_path = Path::new("./screenshot.png");
-    let (mut rl, thread) = raylib::init()
-        .size(1920, 1080)
-        .title("Rust Screenshot")
-        .build();
-
-    let mut camera = Camera2D {
-        target: Vector2 {
-            x: 1920.0 / 2.0,
-            y: 1080.0 / 2.0,
-        },
-        offset: Vector2 {
-            x: 1920.0 / 2.0,
-            y: 1080.0 / 2.0,
-        },
-        rotation: 0.0,
-        zoom: 1.0,
-    };
-
-    rl.set_target_fps(60);
-
     let one_second = Duration::new(1, 0);
     let one_frame = one_second / 60;
 
     let display = Display::primary().expect("Couldn't find primary display.");
     let mut capturer = Capturer::new(display).expect("Couldn't begin capture.");
     let (w, h) = (capturer.width(), capturer.height());
+    let screenshot_path = Path::new("./screenshot.png");
+
+    let mut png_buffer: Vec<u8> = Vec::new();
 
     loop {
         // Wait until there's a frame.
@@ -87,10 +69,27 @@ fn main() {
         break;
     }
 
-    let width = rl.get_screen_width();
-    let height = rl.get_screen_height();
+    let (mut rl, thread) = raylib::init()
+        .size(w as i32, h as i32)
+        .title("Rust Screenshot")
+        .build();
 
-    rl.set_window_size(width as i32, height as i32);
+    let mut camera = Camera2D {
+        target: Vector2 {
+            x: w as f32 / 2.0,
+            y: h as f32 / 2.0,
+        },
+        offset: Vector2 {
+            x: w as f32 / 2.0,
+            y: h as f32 / 2.0,
+        },
+        rotation: 0.0,
+        zoom: 1.0,
+    };
+
+    rl.set_target_fps(60);
+
+    rl.set_window_size(w as i32, h as i32);
     rl.toggle_fullscreen();
 
     let image = Image::load_image(screenshot_path.as_os_str().to_str().unwrap()).unwrap();
@@ -102,7 +101,7 @@ fn main() {
         if rl.is_key_pressed(raylib::consts::KeyboardKey::KEY_Q)
             || rl.is_key_pressed(raylib::consts::KeyboardKey::KEY_ESCAPE)
         {
-            fs::remove_file(screenshot_path);
+            let _ = fs::remove_file(screenshot_path);
             break;
         }
         if rl.is_key_down(raylib::consts::KeyboardKey::KEY_S) {
