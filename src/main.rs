@@ -1,5 +1,5 @@
-// Add correct pan and zoom controls
 // maybe keep screenshot in memory
+// add friction/velocity to zooming
 extern crate raylib;
 extern crate repng;
 extern crate scrap;
@@ -7,6 +7,7 @@ extern crate scrap;
 use raylib::prelude::*;
 
 use scrap::{Capturer, Display};
+use std::cmp;
 use std::fs;
 use std::fs::File;
 use std::io::ErrorKind::WouldBlock;
@@ -22,8 +23,6 @@ fn main() {
     let mut capturer = Capturer::new(display).expect("Couldn't begin capture.");
     let (w, h) = (capturer.width(), capturer.height());
     let screenshot_path = Path::new("./screenshot.png");
-
-    let mut png_buffer: Vec<u8> = Vec::new();
 
     loop {
         // Wait until there's a frame.
@@ -96,6 +95,9 @@ fn main() {
     let texture = rl.load_texture_from_image(&thread, &image).unwrap();
 
     let mut prev_mouse_pos = rl.get_mouse_position();
+    let mut delta_scale = 0.0;
+    let zoom_friction = 8.0;
+    let zoom_speed = 2.5;
 
     while !rl.window_should_close() {
         if rl.is_key_pressed(raylib::consts::KeyboardKey::KEY_Q)
@@ -127,14 +129,22 @@ fn main() {
             camera.zoom -= 0.05;
         }
         let mouse_delta = rl.get_mouse_wheel_move();
-        let mut new_zoom = camera.zoom + mouse_delta * (0.07f32 * camera.zoom);
+        delta_scale += mouse_delta;
+
+        let delta = rl.get_frame_time();
+        camera.zoom = camera.zoom + delta_scale * delta * (zoom_speed * camera.zoom);
+        if camera.zoom < 0.01 {
+            camera.zoom = 0.01;
+        }
+        delta_scale -= delta_scale * delta * zoom_friction;
+        //let mut new_zoom = camera.zoom + mouse_delta * (0.07f32 * camera.zoom);
         // Capping the zoom so you don't zoom
         // out oo much and get lost
-        if new_zoom <= 0.03 {
-            new_zoom = 0.03f32;
-        }
+        //if new_zoom <= 0.03 {
+        //   new_zoom = 0.03f32;
+        //}
 
-        camera.zoom = new_zoom;
+        //camera.zoom = new_zoom;
 
         let mouse_pos = rl.get_mouse_position();
         let delta = prev_mouse_pos - mouse_pos;
