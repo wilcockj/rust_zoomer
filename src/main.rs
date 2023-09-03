@@ -7,12 +7,15 @@ extern crate scrap;
 use raylib::prelude::*;
 
 use scrap::{Capturer, Display};
+use std::fs;
 use std::fs::File;
 use std::io::ErrorKind::WouldBlock;
+use std::path::Path;
 use std::thread;
 use std::time::Duration;
 
 fn main() {
+    let screenshot_path = Path::new("./screenshot.png");
     let (mut rl, thread) = raylib::init()
         .size(1920, 1080)
         .title("Rust Screenshot")
@@ -73,7 +76,7 @@ fn main() {
         // Save the image.
 
         repng::encode(
-            File::create("screenshot.png").unwrap(),
+            File::create(screenshot_path).unwrap(),
             w as u32,
             h as u32,
             &bitflipped,
@@ -90,7 +93,7 @@ fn main() {
     rl.set_window_size(width as i32, height as i32);
     rl.toggle_fullscreen();
 
-    let image = Image::load_image("screenshot.png").unwrap();
+    let image = Image::load_image(screenshot_path.as_os_str().to_str().unwrap()).unwrap();
     let texture = rl.load_texture_from_image(&thread, &image).unwrap();
 
     let mut prev_mouse_pos = rl.get_mouse_position();
@@ -99,6 +102,7 @@ fn main() {
         if rl.is_key_pressed(raylib::consts::KeyboardKey::KEY_Q)
             || rl.is_key_pressed(raylib::consts::KeyboardKey::KEY_ESCAPE)
         {
+            fs::remove_file(screenshot_path);
             break;
         }
         if rl.is_key_down(raylib::consts::KeyboardKey::KEY_S) {
