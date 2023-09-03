@@ -7,12 +7,14 @@ use raylib::prelude::*;
 
 use repng::Options;
 use scrap::{Capturer, Display};
-use std::fs::File;
+use std::fs;
 use std::io::ErrorKind::WouldBlock;
+use std::path::Path;
 use std::thread;
 use std::time::Duration;
 
 fn main() {
+    let screenshot_path = Path::new("./screenshot.png");
     let display = Display::primary().expect("Couldn't find primary display.");
     let mut capturer = Capturer::new(display).expect("Couldn't begin capture.");
     let (w, h) = (capturer.width(), capturer.height());
@@ -20,7 +22,7 @@ fn main() {
     let zoom_speed = 0.07f32;
     let one_second = Duration::new(1, 0);
     let one_frame = one_second / 60;
-    let mut png_data: Vec<u8> = Vec::new();
+    let mut png_data = Vec::new();
     loop {
         // Wait until there's a frame.
 
@@ -37,6 +39,10 @@ fn main() {
             }
         };
 
+        let mut encoder = Options::smallest(w as u32, h as u32)
+            .build(&mut png_data)
+            .unwrap();
+
         println!("Captured! Writing...");
 
         // Flip the BGRA image into a RGBA image.
@@ -50,9 +56,11 @@ fn main() {
                 let i = stride * y + 4 * x;
                 row.extend_from_slice(&[buffer[i + 2], buffer[i + 1], buffer[i], buffer[i + 3]]);
             }
-            png_data.extend_from_slice(&row);
+            encoder.write(&row).unwrap();
+            //png_data.extend_from_slice(&row);
         }
 
+        encoder.finish().unwrap();
         println!("Image written to png_data");
         break;
     }
@@ -80,6 +88,8 @@ fn main() {
     rl.set_window_size(w as i32, h as i32);
     rl.toggle_fullscreen();
 
+    //let mem_image = Image::gen_image_color(w as i32, h as i32, Color::WHITE);
+    // mem_image.data = png_data;
     let mem_image = Image::load_image_from_mem("png", &png_data, (w * h * 4) as i32).unwrap();
     let texture = rl.load_texture_from_image(&thread, &mem_image).unwrap();
 
@@ -89,6 +99,7 @@ fn main() {
         if rl.is_key_pressed(raylib::consts::KeyboardKey::KEY_Q)
             || rl.is_key_pressed(raylib::consts::KeyboardKey::KEY_ESCAPE)
         {
+            fs::remove_file(screenshot_path);
             break;
         }
         if rl.is_key_down(raylib::consts::KeyboardKey::KEY_S) {
