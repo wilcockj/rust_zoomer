@@ -123,6 +123,16 @@ fn main() {
         if rl.is_key_down(raylib::consts::KeyboardKey::KEY_DOWN) {
             camera.zoom -= 0.05;
         }
+        let mouse_delta = rl.get_mouse_wheel_move();
+        let mut new_zoom = camera.zoom + mouse_delta * (0.07f32 * camera.zoom);
+        // Capping the zoom so you don't zoom
+        // out oo much and get lost
+        if new_zoom <= 0.03 {
+            new_zoom = 0.03f32;
+        }
+
+        camera.zoom = new_zoom;
+
         let mouse_pos = rl.get_mouse_position();
         let delta = prev_mouse_pos - mouse_pos;
         prev_mouse_pos = mouse_pos;
