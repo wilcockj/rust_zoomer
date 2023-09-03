@@ -1,4 +1,5 @@
 // Add correct pan and zoom controls
+// maybe keep screenshot in memory
 extern crate raylib;
 extern crate repng;
 extern crate scrap;
@@ -92,6 +93,8 @@ fn main() {
     let image = Image::load_image("screenshot.png").unwrap();
     let texture = rl.load_texture_from_image(&thread, &image).unwrap();
 
+    let mut prev_mouse_pos = rl.get_mouse_position();
+
     while !rl.window_should_close() {
         if rl.is_key_pressed(raylib::consts::KeyboardKey::KEY_Q)
             || rl.is_key_pressed(raylib::consts::KeyboardKey::KEY_ESCAPE)
@@ -119,6 +122,13 @@ fn main() {
         }
         if rl.is_key_down(raylib::consts::KeyboardKey::KEY_DOWN) {
             camera.zoom -= 0.05;
+        }
+        let mouse_pos = rl.get_mouse_position();
+        let delta = prev_mouse_pos - mouse_pos;
+        prev_mouse_pos = mouse_pos;
+
+        if rl.is_mouse_button_down(raylib::consts::MouseButton::MOUSE_RIGHT_BUTTON) {
+            camera.target = rl.get_screen_to_world2D(camera.offset + delta, camera);
         }
 
         let mut d = rl.begin_drawing(&thread);
