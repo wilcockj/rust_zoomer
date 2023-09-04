@@ -7,11 +7,10 @@ extern crate scrap;
 use raylib::prelude::*;
 
 use scrap::{Capturer, Display};
-use std::cmp;
+use std::env::temp_dir;
 use std::fs;
 use std::fs::File;
 use std::io::ErrorKind::WouldBlock;
-use std::path::Path;
 use std::thread;
 use std::time::Duration;
 
@@ -22,7 +21,12 @@ fn main() {
     let display = Display::primary().expect("Couldn't find primary display.");
     let mut capturer = Capturer::new(display).expect("Couldn't begin capture.");
     let (w, h) = (capturer.width(), capturer.height());
-    let screenshot_path = Path::new("./screenshot.png");
+
+    let mut temp_screenshot_path = temp_dir();
+
+    let file_name = format!("{}.png", "rustzoomerscreenshot");
+
+    temp_screenshot_path.push(file_name);
 
     loop {
         // Wait until there's a frame.
@@ -57,14 +61,14 @@ fn main() {
         // Save the image.
 
         repng::encode(
-            File::create(screenshot_path).unwrap(),
+            File::create(temp_screenshot_path.clone()).unwrap(),
             w as u32,
             h as u32,
             &bitflipped,
         )
         .unwrap();
 
-        println!("Image saved to `screenshot.png`.");
+        println!("Image saved to {:?}.", temp_screenshot_path);
         break;
     }
 
@@ -91,8 +95,10 @@ fn main() {
     rl.set_window_size(w as i32, h as i32);
     rl.toggle_fullscreen();
 
-    let image = Image::load_image(screenshot_path.as_os_str().to_str().unwrap()).unwrap();
-    let texture = rl.load_texture_from_image(&thread, &image).unwrap();
+    // load texture directly from file
+    let texture = rl
+        .load_texture(&thread, temp_screenshot_path.as_os_str().to_str().unwrap())
+        .unwrap();
 
     let mut prev_mouse_pos = rl.get_mouse_position();
     let mut delta_scale = 0.0;
@@ -103,7 +109,7 @@ fn main() {
         if rl.is_key_pressed(raylib::consts::KeyboardKey::KEY_Q)
             || rl.is_key_pressed(raylib::consts::KeyboardKey::KEY_ESCAPE)
         {
-            let _ = fs::remove_file(screenshot_path);
+            let _ = fs::remove_file(temp_screenshot_path);
             break;
         }
         if rl.is_key_down(raylib::consts::KeyboardKey::KEY_S) {
@@ -122,23 +128,20 @@ fn main() {
             camera.offset.x += 10.0;
             camera.target.x += 10.0;
         }
-        if rl.is_key_down(raylib::consts::KeyboardKey::KEY_UP) {
-            camera.zoom += 0.05;
-        }
-        if rl.is_key_down(raylib::consts::KeyboardKey::KEY_DOWN) {
-            camera.zoom -= 0.05;
-        }
 
         let mouse_pos = rl.get_mouse_position();
         let wheel = rl.get_mouse_wheel_move();
         if wheel != 0.0 || delta_scale != 0.0 {
+            // calculate the amount of zoom this frame
             delta_scale += wheel;
 
             let delta = rl.get_frame_time();
+            // add zoom velocity to camera zoom
             camera.zoom = camera.zoom + delta_scale * delta * (zoom_speed * camera.zoom);
             if camera.zoom < 0.01 {
                 camera.zoom = 0.01;
             }
+            // apply friction on the zoom velocity
             delta_scale -= delta_scale * delta * zoom_friction;
             if delta_scale < 0.1 && delta_scale > -0.1 {
                 delta_scale = 0.0;
@@ -146,14 +149,6 @@ fn main() {
             camera.target = rl.get_screen_to_world2D(mouse_pos, camera);
             camera.offset = mouse_pos;
         }
-        //let mut new_zoom = camera.zoom + mouse_delta * (0.07f32 * camera.zoom);
-        // Capping the zoom so you don't zoom
-        // out oo much and get lost
-        //if new_zoom <= 0.03 {
-        //   new_zoom = 0.03f32;
-        //}
-
-        //camera.zoom = new_zoom;
 
         let delta = prev_mouse_pos - mouse_pos;
         prev_mouse_pos = mouse_pos;
@@ -173,12 +168,5 @@ fn main() {
         d.draw_text("Press Q or ESCAPE to quit", 10, 10, 20, Color::GRAY);
         let zoom_amount = format!("zoom amount = {zoom}", zoom = camera.zoom);
         d.draw_text(&zoom_amount, 10, 30, 20, Color::GRAY);
-
-        /*
-                let mut d = rl.begin_drawing(&thread);
-                d.clear_background(Color::WHITE);
-                d.draw_texture(&texture, 0, 0, Color::WHITE);
-        */
-        //d.draw_text("Press 'ESC' or 'Q' to quit.", 10, 10, 20, Color::BLACK);
     }
 }
