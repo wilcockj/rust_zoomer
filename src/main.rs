@@ -6,6 +6,10 @@ extern crate scrap;
 
 use raylib::prelude::*;
 
+use log::debug;
+use log::error;
+use log::info;
+use log::warn;
 use scrap::{Capturer, Display};
 use std::env::temp_dir;
 use std::fs;
@@ -16,18 +20,15 @@ use std::thread;
 use std::time::Duration;
 
 fn main() {
-    let one_second = Duration::new(1, 0);
-    let one_frame = one_second / 60;
-
-    let mut temp_screenshot_path = temp_dir();
-
-    let file_name = format!("{}.png", "rustzoomerscreenshot");
-
-    temp_screenshot_path.push(file_name);
+    env_logger::init();
+    use std::time::Instant;
+    let now = Instant::now();
 
     let (tx, rx) = mpsc::channel();
 
     std::thread::spawn(move || {
+        let one_second = Duration::new(1, 0);
+        let one_frame = one_second / 60;
         let display = Display::primary().expect("Couldn't find primary display.");
         let mut capturer = Capturer::new(display).expect("Couldn't begin capture.");
         let (w, h) = (capturer.width(), capturer.height());
@@ -52,7 +53,7 @@ fn main() {
                 }
             };
 
-            println!("Captured! Saving...");
+            //println!("Captured! Saving...");
 
             // Flip the ARGB image into a BGRA image.
 
@@ -76,11 +77,17 @@ fn main() {
             )
             .unwrap();
 
-            println!("Image saved to {:?}.", temp_screenshot_path);
+            //println!("Image saved to {:?}.", temp_screenshot_path);
             tx.send(()).unwrap();
             break;
         }
     });
+
+    let mut temp_screenshot_path = temp_dir();
+
+    let file_name = format!("{}.png", "rustzoomerscreenshot");
+
+    temp_screenshot_path.push(file_name);
 
     let display = Display::primary().expect("Couldn't find primary display.");
     let capturer = Capturer::new(display).expect("Couldn't begin capture.");
@@ -119,28 +126,17 @@ fn main() {
     let zoom_friction = 8.0;
     let zoom_speed = 2.5;
 
+    let elapsed = now.elapsed();
+    info!(
+        "Time to take screenshot and initialize window was {:.2?}",
+        elapsed
+    );
     while !rl.window_should_close() {
         if rl.is_key_pressed(raylib::consts::KeyboardKey::KEY_Q)
             || rl.is_key_pressed(raylib::consts::KeyboardKey::KEY_ESCAPE)
         {
             let _ = fs::remove_file(temp_screenshot_path);
             break;
-        }
-        if rl.is_key_down(raylib::consts::KeyboardKey::KEY_S) {
-            camera.offset.y -= 10.0;
-            camera.target.y -= 10.0;
-        }
-        if rl.is_key_down(raylib::consts::KeyboardKey::KEY_W) {
-            camera.offset.y += 10.0;
-            camera.target.y += 10.0;
-        }
-        if rl.is_key_down(raylib::consts::KeyboardKey::KEY_A) {
-            camera.offset.x -= 10.0;
-            camera.target.x -= 10.0;
-        }
-        if rl.is_key_down(raylib::consts::KeyboardKey::KEY_D) {
-            camera.offset.x += 10.0;
-            camera.target.x += 10.0;
         }
 
         let mouse_pos = rl.get_mouse_position();
@@ -180,7 +176,7 @@ fn main() {
         }
 
         d.draw_text("Press Q or ESCAPE to quit", 10, 10, 20, Color::GRAY);
-        let zoom_amount = format!("zoom amount = {zoom}", zoom = camera.zoom);
+        let zoom_amount = format!("zoom amount = {zoom:.2}", zoom = camera.zoom);
         d.draw_text(&zoom_amount, 10, 30, 20, Color::GRAY);
     }
 }
