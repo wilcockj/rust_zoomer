@@ -6,16 +6,12 @@ extern crate scrap;
 
 use raylib::prelude::*;
 
-use log::debug;
-use log::error;
 use log::info;
-use log::warn;
 use scrap::{Capturer, Display};
 use std::env::temp_dir;
 use std::fs;
-use std::fs::File;
+use std::io::Cursor;
 use std::io::ErrorKind::WouldBlock;
-use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
@@ -24,74 +20,56 @@ fn main() {
     use std::time::Instant;
     let now = Instant::now();
 
-    let (tx, rx) = mpsc::channel();
+    let one_second = Duration::new(1, 0);
+    let one_frame = one_second / 60;
+    let display = Display::primary().expect("Couldn't find primary display.");
+    let mut capturer = Capturer::new(display).expect("Couldn't begin capture.");
 
-    std::thread::spawn(move || {
-        let one_second = Duration::new(1, 0);
-        let one_frame = one_second / 60;
-        let display = Display::primary().expect("Couldn't find primary display.");
-        let mut capturer = Capturer::new(display).expect("Couldn't begin capture.");
-        let (w, h) = (capturer.width(), capturer.height());
-        let mut temp_screenshot_path = temp_dir();
-
-        let file_name = format!("{}.png", "rustzoomerscreenshot");
-
-        temp_screenshot_path.push(file_name);
-        loop {
-            // Wait until there's a frame.
-
-            let buffer = match capturer.frame() {
-                Ok(buffer) => buffer,
-                Err(error) => {
-                    if error.kind() == WouldBlock {
-                        // Keep spinning.
-                        thread::sleep(one_frame);
-                        continue;
-                    } else {
-                        panic!("Error: {}", error);
-                    }
-                }
-            };
-
-            //println!("Captured! Saving...");
-
-            // Flip the ARGB image into a BGRA image.
-
-            let mut bitflipped = Vec::with_capacity(w * h * 4);
-            let stride = buffer.len() / h;
-
-            for y in 0..h {
-                for x in 0..w {
-                    let i = stride * y + 4 * x;
-                    bitflipped.extend_from_slice(&[buffer[i + 2], buffer[i + 1], buffer[i], 255]);
-                }
-            }
-
-            // Save the image.
-
-            repng::encode(
-                File::create(temp_screenshot_path.clone()).unwrap(),
-                w as u32,
-                h as u32,
-                &bitflipped,
-            )
-            .unwrap();
-
-            //println!("Image saved to {:?}.", temp_screenshot_path);
-            tx.send(()).unwrap();
-            break;
-        }
-    });
-
+    let (w, h) = (capturer.width(), capturer.height());
     let mut temp_screenshot_path = temp_dir();
 
     let file_name = format!("{}.png", "rustzoomerscreenshot");
 
     temp_screenshot_path.push(file_name);
+    let mut png_buffer = Vec::new();
 
-    let display = Display::primary().expect("Couldn't find primary display.");
-    let capturer = Capturer::new(display).expect("Couldn't begin capture.");
-    let (w, h) = (capturer.width(), capturer.height());
+    loop {
+        // Wait until there's a frame.
+
+        let buffer = match capturer.frame() {
+            Ok(buffer) => buffer,
+            Err(error) => {
+                if error.kind() == WouldBlock {
+                    // Keep spinning.
+                    thread::sleep(one_frame);
+                    continue;
+                } else {
+                    panic!("Error: {}", error);
+                }
+            }
+        };
+
+        //println!("Captured! Saving...");
+
+        // Flip the ARGB image into a BGRA image.
+
+        let mut bitflipped = Vec::with_capacity(w * h * 4);
+        let stride = buffer.len() / h;
+
+        for y in 0..h {
+            for x in 0..w {
+                let i = stride * y + 4 * x;
+                bitflipped.extend_from_slice(&[buffer[i + 2], buffer[i + 1], buffer[i], 255]);
+            }
+        }
+
+        // Save the image.
+
+        let cursor = Cursor::new(&mut png_buffer);
+        repng::encode(cursor, w as u32, h as u32, &bitflipped).unwrap();
+        break;
+    }
+
     let (mut rl, thread) = raylib::init()
         .size(w as i32, h as i32)
         .title("Rust Screenshot")
@@ -114,19 +92,21 @@ fn main() {
 
     rl.set_window_size(w as i32, h as i32);
     rl.toggle_fullscreen();
-
-    rx.recv().unwrap();
-    // load texture directly from file
-    let texture = rl
-        .load_texture(&thread, temp_screenshot_path.as_os_str().to_str().unwrap())
-        .unwrap();
-
     let mut prev_mouse_pos = rl.get_mouse_position();
     let mut delta_scale = 0.0;
     let zoom_friction = 8.0;
     let zoom_speed = 2.5;
 
+    let img = raylib::core::texture::Image::load_image_from_mem(
+        ".png",
+        &png_buffer,
+        png_buffer.len() as i32,
+    )
+    .unwrap();
+
+    let texture = rl.load_texture_from_image(&thread, &img).unwrap();
     let elapsed = now.elapsed();
+
     info!(
         "Time to take screenshot and initialize window was {:.2?}",
         elapsed
