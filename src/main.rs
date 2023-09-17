@@ -26,17 +26,21 @@ fn main() {
 
     let (tx, rx) = mpsc::channel();
 
+    let mut temp_screenshot_path = temp_dir();
+    let file_name = format!("{}.png", "rustzoomerscreenshot");
+    temp_screenshot_path.push(file_name);
     std::thread::spawn(move || {
         let one_second = Duration::new(1, 0);
         let one_frame = one_second / 60;
         let display = Display::primary().expect("Couldn't find primary display.");
         let mut capturer = Capturer::new(display).expect("Couldn't begin capture.");
         let (w, h) = (capturer.width(), capturer.height());
+
         let mut temp_screenshot_path = temp_dir();
-
         let file_name = format!("{}.png", "rustzoomerscreenshot");
-
         temp_screenshot_path.push(file_name);
+
+
         loop {
             // Wait until there's a frame.
 
@@ -83,15 +87,8 @@ fn main() {
         }
     });
 
-    let mut temp_screenshot_path = temp_dir();
-
-    let file_name = format!("{}.png", "rustzoomerscreenshot");
-
-    temp_screenshot_path.push(file_name);
-
     let display = Display::primary().expect("Couldn't find primary display.");
-    let capturer = Capturer::new(display).expect("Couldn't begin capture.");
-    let (w, h) = (capturer.width(), capturer.height());
+    let (w, h) = (display.width(), display.height());
     let (mut rl, thread) = raylib::init()
         .size(w as i32, h as i32)
         .title("Rust Screenshot")
