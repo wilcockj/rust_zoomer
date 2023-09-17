@@ -14,26 +14,39 @@ use std::io::Cursor;
 use std::io::ErrorKind::WouldBlock;
 use std::thread;
 use std::time::Duration;
+use std::sync::mpsc;
 
 fn main() {
-    env_logger::init();
     use std::time::Instant;
     let now = Instant::now();
+    env_logger::init();
 
-    let one_second = Duration::new(1, 0);
-    let one_frame = one_second / 60;
-    let display = Display::primary().expect("Couldn't find primary display.");
-    let mut capturer = Capturer::new(display).expect("Couldn't begin capture.");
 
-    let (w, h) = (capturer.width(), capturer.height());
     let mut temp_screenshot_path = temp_dir();
 
     let file_name = format!("{}.png", "rustzoomerscreenshot");
 
     temp_screenshot_path.push(file_name);
-    let mut png_buffer = Vec::new();
 
-    loop {
+
+    let (tx, rx) = mpsc::channel();
+
+    thread::spawn(move || {
+        let one_second = Duration::new(1, 0);
+        let one_frame = one_second / 60;
+        let display = Display::primary().expect("Couldn't find primary display.");
+        let mut capturer = Capturer::new(display).expect("Couldn't begin capture.");
+
+        let (w, h) = (capturer.width(), capturer.height());
+        let mut temp_screenshot_path = temp_dir();
+
+        let file_name = format!("{}.png", "rustzoomerscreenshot");
+
+        temp_screenshot_path.push(file_name);
+        let mut png_buffer = Vec::new();
+
+
+        loop {
         // Wait until there's a frame.
 
         let buffer = match capturer.frame() {
@@ -67,8 +80,14 @@ fn main() {
 
         let cursor = Cursor::new(&mut png_buffer);
         repng::encode(cursor, w as u32, h as u32, &bitflipped).unwrap();
+        tx.send(png_buffer).unwrap();
+    
         break;
-    }
+    }});
+
+    let display = Display::primary().expect("Couldn't find primary display.");
+
+    let (w, h) = (display.width(), display.height());
 
     let (mut rl, thread) = raylib::init()
         .size(w as i32, h as i32)
@@ -88,14 +107,12 @@ fn main() {
         zoom: 1.0,
     };
 
-    rl.set_target_fps(144);
+    //rl.set_target_fps(144);
 
-    rl.set_window_size(w as i32, h as i32);
+    //rl.set_window_size(w as i32, h as i32);
     rl.toggle_fullscreen();
-    let mut prev_mouse_pos = rl.get_mouse_position();
-    let mut delta_scale = 0.0;
-    let zoom_friction = 8.0;
-    let zoom_speed = 2.5;
+
+    let png_buffer = rx.recv().unwrap();
 
     let img = raylib::core::texture::Image::load_image_from_mem(
         ".png",
@@ -105,12 +122,18 @@ fn main() {
     .unwrap();
 
     let texture = rl.load_texture_from_image(&thread, &img).unwrap();
-    let elapsed = now.elapsed();
 
-    info!(
-        "Time to take screenshot and initialize window was {:.2?}",
-        elapsed
-    );
+    let elapsed = now.elapsed();
+        info!(
+            "Time to take screenshot and initialize window was {:.2?}",
+            elapsed
+        );
+
+    let mut prev_mouse_pos = rl.get_mouse_position();
+    let mut delta_scale = 0.0;
+    let zoom_friction = 8.0;
+    let zoom_speed = 2.5;
+
     while !rl.window_should_close() {
         if rl.is_key_pressed(raylib::consts::KeyboardKey::KEY_Q)
             || rl.is_key_pressed(raylib::consts::KeyboardKey::KEY_ESCAPE)
